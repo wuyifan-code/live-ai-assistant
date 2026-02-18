@@ -27,6 +27,14 @@ from tools.danmaku_analysis_tool import (
     detect_language_and_suggest,
     categorize_user_question
 )
+from tools.visual_awareness_tool import (
+    extract_text_from_screen,
+    detect_product_in_scene,
+    analyze_scene_context
+)
+from tools.knowledge_base_tool import (
+    rag_search_product_info
+)
 
 LLM_CONFIG = "config/agent_llm_config.json"
 
@@ -67,17 +75,26 @@ def build_agent(ctx=None):
     
     # 导入所有工具
     tools = [
+        # 商品查询工具
         query_product,
         query_product_list,
         get_product_by_sku,
+        # 价格库存验证工具
         verify_price,
         verify_stock,
         check_product_availability,
         verify_anchor_speech,
+        # 弹幕分析工具
         analyze_danmaku,
         generate_reply,
         detect_language_and_suggest,
-        categorize_user_question
+        categorize_user_question,
+        # 视觉识别工具
+        extract_text_from_screen,
+        detect_product_in_scene,
+        analyze_scene_context,
+        # 知识库工具
+        rag_search_product_info
     ]
     
     return create_agent(
