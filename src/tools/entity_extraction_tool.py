@@ -194,7 +194,7 @@ def smart_extract_price(speech_text: str, runtime: ToolRuntime = None) -> str:
     
     try:
         # 先尝试提取实体
-        entity_result = extract_anchor_entities.func(speech_text)
+        entity_result = extract_anchor_entities(speech_text=speech_text)
         
         # 解析结果
         if "价格:" in entity_result:
@@ -241,7 +241,7 @@ def smart_extract_stock(speech_text: str, runtime: ToolRuntime = None) -> str:
     
     try:
         # 先尝试提取实体
-        entity_result = extract_anchor_entities.func(speech_text)
+        entity_result = extract_anchor_entities(speech_text=speech_text)
         
         # 解析结果
         if "库存:" in entity_result:

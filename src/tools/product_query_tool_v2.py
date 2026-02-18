@@ -9,17 +9,30 @@ from langchain.tools import tool, ToolRuntime
 from coze_coding_utils.runtime_ctx.context import new_context
 
 from src.storage.database.supabase_client import get_supabase_client
-from src.storage.redis_cache import (
-    get_cache,
-    cache_product,
-    get_cached_product,
-    cache_product_price,
-    get_cached_product_price,
-    cache_product_stock,
-    get_cached_product_stock
-)
 
 logger = logging.getLogger(__name__)
+
+# 延迟导入Redis相关函数，以避免循环导入
+def _get_redis_func(func_name: str):
+    """延迟导入Redis缓存函数"""
+    from src.storage.redis_cache import (
+        get_cache,
+        cache_product,
+        get_cached_product,
+        cache_product_price,
+        get_cached_product_price,
+        cache_product_stock,
+        get_cached_product_stock
+    )
+    return {
+        'get_cache': get_cache,
+        'cache_product': cache_product,
+        'get_cached_product': get_cached_product,
+        'cache_product_price': cache_product_price,
+        'get_cached_product_price': get_cached_product_price,
+        'cache_product_stock': cache_product_stock,
+        'get_cached_product_stock': get_cached_product_stock,
+    }[func_name]
 
 
 def _search_product_by_name(query: str, client) -> Optional[dict]:
@@ -54,7 +67,7 @@ def query_product_v2(product_name: str, runtime: ToolRuntime = None) -> str:
     
     try:
         client = get_supabase_client()
-        cache = get_cache()
+        cache = _get_redis_func('get_cache')
         
         # 先从缓存查询
         cached_result = cache.get(f"search:{product_name}")
@@ -73,16 +86,22 @@ def query_product_v2(product_name: str, runtime: ToolRuntime = None) -> str:
             return f"商品已下架: {product['name']}"
         
         # 获取价格（优先从缓存）
-        price = get_cached_product_price(product['id'])
+        get_cached_product_price_func = _get_redis_func('get_cached_product_price')
+        cache_product_price_func = _get_redis_func('cache_product_price')
+        
+        price = get_cached_product_price_func(product['id'])
         if price is None:
             price = float(product['price'])
-            cache_product_price(product['id'], price)
+            cache_product_price_func(product['id'], price)
         
         # 获取库存（优先从缓存）
-        stock = get_cached_product_stock(product['id'])
+        get_cached_product_stock_func = _get_redis_func('get_cached_product_stock')
+        cache_product_stock_func = _get_redis_func('cache_product_stock')
+        
+        stock = get_cached_product_stock_func(product['id'])
         if stock is None:
             stock = int(product['stock'])
-            cache_product_stock(product['id'], stock)
+            cache_product_stock_func(product['id'], stock)
         
         stock_status = "有货" if stock > 0 else "缺货"
         
@@ -123,7 +142,7 @@ def query_product_list_v2(category: str = "", limit: int = 20, runtime: ToolRunt
     
     try:
         client = get_supabase_client()
-        cache = get_cache()
+        cache = _get_redis_func('get_cache')
         
         # 生成缓存键
         cache_key = f"product_list:{category}:{limit}"
@@ -148,13 +167,16 @@ def query_product_list_v2(category: str = "", limit: int = 20, runtime: ToolRunt
         if not products:
             return "没有找到相关商品。"
         
+        get_cached_product_stock_func = _get_redis_func('get_cached_product_stock')
+        cache_product_stock_func = _get_redis_func('cache_product_stock')
+        
         response_parts = [f"共找到 {len(products)} 个商品:\n"]
         
         for product in products:
-            stock = get_cached_product_stock(product['id'])
+            stock = get_cached_product_stock_func(product['id'])
             if stock is None:
                 stock = int(product['stock'])
-                cache_product_stock(product['id'], stock)
+                cache_product_stock_func(product['id'], stock)
             
             stock_status = "有货" if stock > 0 else "缺货"
             response_parts.append(
@@ -191,7 +213,7 @@ def get_product_by_sku_v2(sku: str, runtime: ToolRuntime = None) -> str:
     
     try:
         client = get_supabase_client()
-        cache = get_cache()
+        cache = _get_redis_func('get_cache')
         
         # 先从缓存查询
         cached_result = cache.get(f"sku:{sku}")
@@ -208,12 +230,17 @@ def get_product_by_sku_v2(sku: str, runtime: ToolRuntime = None) -> str:
         product = response.data[0]
         
         # 获取价格和库存（优先从缓存）
-        price = get_cached_product_price(product['id'])
+        get_cached_product_price_func = _get_redis_func('get_cached_product_price')
+        cache_product_price_func = _get_redis_func('cache_product_price')
+        get_cached_product_stock_func = _get_redis_func('get_cached_product_stock')
+        cache_product_stock_func = _get_redis_func('cache_product_stock')
+        
+        price = get_cached_product_price_func(product['id'])
         if price is None:
             price = float(product['price'])
-            cache_product_price(product['id'], price)
+            cache_product_price_func(product['id'], price)
         
-        stock = get_cached_product_stock(product['id'])
+        stock = get_cached_product_stock_func(product['id'])
         if stock is None:
             stock = int(product['stock'])
             cache_product_stock(product['id'], stock)

@@ -251,3 +251,44 @@ async def categorize_and_add_danmaku(queue: PriorityDanmakuQueue, user_data: dic
     
     # 添加到队列
     await queue.add_danmaku(danmaku)
+
+
+# 全局弹幕处理器实例
+danmaku_queue = PriorityDanmakuQueue()
+
+
+async def process_danmaku(danmaku: Danmaku) -> Optional[dict]:
+    """
+    处理单条弹幕（简化版）
+    
+    参数:
+        danmaku: 弹幕对象
+    
+    返回:
+        处理结果
+    """
+    logger.info(f"处理弹幕: [{danmaku.username}] {danmaku.content}")
+    
+    # 这里可以添加具体的处理逻辑
+    # 例如：调用AI回复、查询数据库等
+    
+    return {
+        "user_id": danmaku.user_id,
+        "username": danmaku.username,
+        "content": danmaku.content,
+        "priority": danmaku.priority.name,
+        "category": danmaku.category,
+        "processed": True
+    }
+
+
+# 导出全局实例
+__all__ = [
+    "Priority",
+    "Danmaku",
+    "DanmakuDeduplicator",
+    "PriorityDanmakuQueue",
+    "categorize_and_add_danmaku",
+    "danmaku_queue",
+    "process_danmaku"
+]
