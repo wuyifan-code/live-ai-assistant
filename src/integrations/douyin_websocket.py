@@ -8,11 +8,17 @@ import json
 import logging
 import time
 import gzip
-import struct
-from typing import Callable, Optional, Dict, Any, List
+from typing import Callable, Optional, Dict, Any
 from datetime import datetime
 import hashlib
 import os
+
+# 导入消息类型
+from integrations.message_types import (
+    DanmakuMessage, GiftMessage, LikeMessage, 
+    EnterMessage, FollowMessage, ShareMessage,
+    parse_message
+)
 
 logger = logging.getLogger(__name__)
 
@@ -262,46 +268,95 @@ class DouyinWebSocketConnector:
             logger.error(f"消息处理失败: {str(e)}")
     
     async def _handle_danmaku(self, data: Dict):
-        """处理弹幕消息"""
+        """
+        处理弹幕消息
+        
+        标准格式:
+        {
+            "type": "danmaku",
+            "user_id": "123456789",
+            "username": "用户昵称",
+            "content": "iPhone 15 Pro多少钱？",
+            "timestamp": "2024-01-01T12:00:00.000Z",
+            "room_id": "room_001"
+        }
+        """
         try:
             self.stats["danmaku_count"] += 1
             
-            danmaku = {
-                "type": "danmaku",
-                "user_id": data.get("user_id", ""),
-                "username": data.get("nickname", data.get("username", "匿名用户")),
-                "content": data.get("content", ""),
-                "timestamp": data.get("timestamp", datetime.now().isoformat()),
-                "room_id": self.room_id
-            }
+            # 使用消息类型解析
+            message = parse_message(data)
             
-            logger.info(f"📥 [{danmaku['username']}]: {danmaku['content']}")
-            
-            if self.on_danmaku:
-                await self.on_danmaku(danmaku)
+            if isinstance(message, DanmakuMessage):
+                logger.info(f"📥 [{message.username}]: {message.content}")
+                
+                if self.on_danmaku:
+                    # 转换为字典格式传递给回调
+                    danmaku_dict = message.to_dict()
+                    await self.on_danmaku(danmaku_dict)
+            else:
+                # 兼容旧格式
+                danmaku = {
+                    "type": "danmaku",
+                    "user_id": data.get("user_id", ""),
+                    "username": data.get("nickname", data.get("username", "匿名用户")),
+                    "content": data.get("content", ""),
+                    "timestamp": data.get("timestamp", datetime.now().isoformat()),
+                    "room_id": self.room_id
+                }
+                
+                logger.info(f"📥 [{danmaku['username']}]: {danmaku['content']}")
+                
+                if self.on_danmaku:
+                    await self.on_danmaku(danmaku)
                 
         except Exception as e:
             logger.error(f"处理弹幕失败: {str(e)}")
     
     async def _handle_gift(self, data: Dict):
-        """处理礼物消息"""
+        """
+        处理礼物消息
+        
+        标准格式:
+        {
+            "type": "gift",
+            "user_id": "123456789",
+            "username": "用户昵称",
+            "gift_id": "gift_001",
+            "gift_name": "小心心",
+            "gift_count": 10,
+            "gift_value": 100,
+            "timestamp": "2024-01-01T12:00:00.000Z",
+            "room_id": "room_001"
+        }
+        """
         try:
             self.stats["gift_count"] += 1
             
-            gift = {
-                "type": "gift",
-                "user_id": data.get("user_id", ""),
-                "username": data.get("nickname", "匿名用户"),
-                "gift_name": data.get("gift_name", ""),
-                "gift_count": data.get("gift_count", 1),
-                "gift_value": data.get("gift_value", 0),
-                "timestamp": datetime.now().isoformat()
-            }
+            # 使用消息类型解析
+            message = parse_message(data)
             
-            logger.info(f"🎁 [{gift['username']}] 送出 {gift['gift_name']} x{gift['gift_count']}")
-            
-            if self.on_gift:
-                await self.on_gift(gift)
+            if isinstance(message, GiftMessage):
+                logger.info(f"🎁 [{message.username}] 送出 {message.gift_name} x{message.gift_count}")
+                
+                if self.on_gift:
+                    await self.on_gift(message.to_dict())
+            else:
+                # 兼容旧格式
+                gift = {
+                    "type": "gift",
+                    "user_id": data.get("user_id", ""),
+                    "username": data.get("nickname", "匿名用户"),
+                    "gift_name": data.get("gift_name", ""),
+                    "gift_count": data.get("gift_count", 1),
+                    "gift_value": data.get("gift_value", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                logger.info(f"🎁 [{gift['username']}] 送出 {gift['gift_name']} x{gift['gift_count']}")
+                
+                if self.on_gift:
+                    await self.on_gift(gift)
                 
         except Exception as e:
             logger.error(f"处理礼物失败: {str(e)}")
