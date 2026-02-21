@@ -408,32 +408,49 @@ class DouyinWebSocketConnector:
         """
         发送消息到直播间
         
+        注意：WebSocket主要用于接收消息，发送消息需要调用HTTP API
+        
         参数:
-            message: 消息内容
+            message: 消息内容（最大200字符）
         
         返回:
             是否发送成功
         """
-        if not self.is_connected or not self.ws:
+        if not self.is_connected:
             logger.warning("未连接到直播间")
             return False
         
         try:
-            # 构建消息
-            msg_data = {
-                "type": "message",
-                "content": message,
-                "timestamp": int(time.time() * 1000)
-            }
+            # 使用HTTP API发送消息
+            from integrations.douyin_api import DouyinLiveAPI
             
-            await self.ws.send(json.dumps(msg_data))
+            api = DouyinLiveAPI()
+            success = await api.send_message(self.room_id, message)
             
-            logger.info(f"📤 发送消息: {message}")
-            return True
+            if success:
+                logger.info(f"📤 消息发送成功: {message[:50]}...")
+            else:
+                logger.warning(f"⚠️ 消息发送失败")
+            
+            return success
             
         except Exception as e:
-            logger.error(f"发送消息失败: {str(e)}")
+            logger.error(f"❌ 发送消息失败: {str(e)}")
             return False
+    
+    async def send_official_correction(self, message: str) -> bool:
+        """
+        发送官方更正消息
+        
+        参数:
+            message: 更正内容
+        
+        返回:
+            是否发送成功
+        """
+        # 添加官方更正前缀
+        official_message = f"【官方更正】{message}"
+        return await self.send_message(official_message)
     
     async def disconnect(self):
         """断开连接"""

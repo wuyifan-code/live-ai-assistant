@@ -269,7 +269,9 @@ class DouyinLiveAPI:
         message_type: str = "text"
     ) -> bool:
         """
-        发送消息到直播间
+        发送消息到抖音直播间
+        
+        API端点: POST /live/chat/send
         
         参数:
             room_id: 直播间ID
@@ -278,29 +280,67 @@ class DouyinLiveAPI:
         
         返回:
             是否发送成功
+        
+        示例:
+            >>> success = await api.send_message("room_001", "欢迎来到直播间！")
+            >>> print(success)
+            True
         """
         try:
             token = await self.get_access_token()
             
-            url = f"{self.API_BASE}/api/live/v1/room/send"
+            # API端点
+            url = f"{self.API_BASE}/live/chat/send"
             
             headers = {"access-token": token}
+            
             data = {
                 "room_id": room_id,
-                "msg_type": message_type,
-                "content": message
+                "content": message,
+                "msg_type": message_type
             }
             
-            response = requests.post(url, headers=headers, json=data, timeout=10)
+            logger.info(f"📤 发送消息到直播间 {room_id}: {message[:30]}...")
+            
+            response = requests.post(
+                url,
+                headers=headers,
+                json=data,
+                timeout=10
+            )
+            
             result = response.json()
             
+            # 检查响应
             if result.get("err_no") == 0:
-                logger.info(f"📤 消息发送成功: {message[:30]}...")
+                logger.info(f"✅ 消息发送成功")
                 return True
             else:
-                logger.warning(f"消息发送失败: {result}")
+                err_msg = result.get("err_msg", "未知错误")
+                err_no = result.get("err_no", -1)
+                
+                # 常见错误码处理
+                error_messages = {
+                    10001: "参数错误",
+                    10002: "token无效或过期",
+                    10003: "权限不足",
+                    10004: "直播间不存在",
+                    10005: "直播间未开播",
+                    10006: "消息内容违规",
+                    10007: "发送频率超限",
+                    10008: "消息过长（最大200字符）"
+                }
+                
+                error_desc = error_messages.get(err_no, err_msg)
+                logger.warning(f"消息发送失败 [{err_no}]: {error_desc}")
                 return False
                 
+        except requests.exceptions.Timeout:
+            logger.error("❌ 发送消息超时")
+            return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ 网络请求失败: {str(e)}")
+            return False
         except Exception as e:
             logger.error(f"❌ 发送消息失败: {str(e)}")
             return False

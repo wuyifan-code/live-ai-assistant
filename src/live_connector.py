@@ -106,28 +106,22 @@ class LiveConnector:
         """
         发送消息到直播间
         
+        注意：实际发送需要通过HTTP API，WebSocket主要用于接收
+        
         参数:
             message: 消息内容
-            is_official: 是否为官方消息
+            is_official: 是否为官方消息（会添加特殊标记）
         """
-        if not self.is_connected or not self.ws:
-            logger.warning("未连接到直播间")
-            return
+        if is_official:
+            message = f"【官方更正】{message}"
         
-        try:
-            data = {
-                "type": "official" if is_official else "danmaku",
-                "content": message,
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            await self.ws.send(json.dumps(data))
-            
-            status = "📢 [官方]" if is_official else "📤 [AI]"
-            logger.info(f"{status} 发送消息: {message}")
-            
-        except Exception as e:
-            logger.error(f"发送消息失败: {str(e)}")
+        # 标记消息状态
+        status = "📢 [官方]" if is_official else "📤 [AI]"
+        logger.info(f"{status} 发送消息: {message[:50]}...")
+        
+        # 实际发送需要子类实现
+        # 例如 DouyinLiveConnector 会调用抖音API
+        pass
     
     async def disconnect(self):
         """断开连接"""
